@@ -791,6 +791,14 @@ pub enum EscrowError {
 
     /// [`LiquifactEscrow::recover_admin`] called before the admin-recovery timelock deadline.
     AdminRecoveryNotExpired = 249,
+
+    /// [`LiquifactEscrow::update_yield_bps`] was called after principal was recorded
+    /// (`funded_amount > 0`).
+    ///
+    /// An investor's effective yield is locked in at their first deposit
+    /// ([`DataKey::InvestorEffectiveYield`]), so moving the base afterwards would leave the
+    /// escrow holding two yield classes with no on-chain signal of the split.
+    YieldBpsLockedAfterFunding = 250,
 }
 
 #[inline(always)]
@@ -6565,9 +6573,17 @@ impl LiquifactEscrow {
     ///
     /// Updates [`InvoiceEscrow::yield_bps`] to `new_yield_bps`. Only valid while the
     /// escrow is in **open** status (`status == 0`) — i.e. before any investor has
-    /// funded and the escrow has been promoted to funded status. Once investors have
-    /// committed principal the yield rate is effectively locked because per-investor
-    /// effective yields may already have been recorded from the base rate.
+    /// funded and the escrow has been promoted to funded status.
+    ///
+    /// The base yield is also **locked once principal exists**: an update after funding
+    /// is rejected with [`EscrowError::YieldBpsLockedAfterFunding`], because a
+    /// per-investor effective yield is recorded from the base rate at each investor's
+    /// first deposit and a later base change would split the escrow into two yield
+    /// classes with no on-chain signal of the split.
+    ///
+    /// The configured tier ladder is re-validated against the new base before the update
+    /// is applied, so a base that would push a tier below the base yield is rejected with
+    /// [`EscrowError::TierYieldBelowBase`] instead of silently devaluing the tier.
     ///
     /// # Bounds
     /// `new_yield_bps` must be in `0..=10_000` (basis points; `10_000` = 100% yield).
@@ -6580,6 +6596,10 @@ impl LiquifactEscrow {
     /// - [`EscrowError::YieldBpsUpdateNotOpen`] — escrow is not in open status.
     /// - [`EscrowError::YieldBpsOutOfRange`] — `new_yield_bps` is outside `0..=10_000`.
     /// - [`EscrowError::YieldBpsUnchanged`] — `new_yield_bps` equals the current value.
+    /// - [`EscrowError::YieldBpsLockedAfterFunding`] — principal is already recorded
+    ///   (`funded_amount > 0`); the base yield is locked once investors exist.
+    /// - [`EscrowError::TierYieldBelowBase`] — a configured tier would fall below the new
+    ///   base yield, which would make locking capital earn less than not locking it.
     ///
     /// # Events
     /// Emits [`YieldBpsUpdatedEvent`] with `invoice_id`, `old_yield_bps`, and `new_yield_bps`.
@@ -6602,6 +6622,25 @@ impl LiquifactEscrow {
             new_yield_bps != escrow.yield_bps,
             EscrowError::YieldBpsUnchanged,
         );
+
+        // The base yield may only move while no principal is recorded. An investor's
+        // effective yield is locked in at their first deposit
+        // (`DataKey::InvestorEffectiveYield`), so a base change after funding would leave
+        // the escrow with two yield classes and no on-chain signal of the split.
+        ensure(
+            &env,
+            escrow.funded_amount == 0,
+            EscrowError::YieldBpsLockedAfterFunding,
+        );
+
+        // The tier ladder must stay valid against the new base: a tier below the base
+        // would make locking capital earn less than not locking it, and
+        // `effective_yield_for_commitment` would silently fall back to the base.
+        let tiers = env
+            .storage()
+            .instance()
+            .get::<DataKey, Vec<YieldTier>>(&DataKey::YieldTierTable);
+        Self::validate_yield_tiers_table(&env, &tiers, new_yield_bps);
 
         let old_yield_bps = escrow.yield_bps;
         escrow.yield_bps = new_yield_bps;
