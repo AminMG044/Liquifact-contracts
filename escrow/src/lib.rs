@@ -3785,9 +3785,7 @@ impl LiquifactEscrow {
 
         for key in keys_to_check.iter() {
             if env.storage().persistent().has(key) {
-                env.storage()
-                    .persistent()
-                    .extend_ttl(key, ttl, ttl);
+                env.storage().persistent().extend_ttl(key, ttl, ttl);
             }
         }
     }
@@ -7373,9 +7371,7 @@ impl LiquifactEscrow {
 
             for key in keys_to_check.iter() {
                 if env.storage().persistent().has(key) {
-                    env.storage()
-                        .persistent()
-                        .extend_ttl(key, ttl, ttl);
+                    env.storage().persistent().extend_ttl(key, ttl, ttl);
                 }
             }
         }
@@ -7486,21 +7482,14 @@ impl LiquifactEscrow {
                     // five per-investor keys written yet. Skipping absent keys is safe:
                     // there is nothing to keep alive if the entry does not exist.
                     if env.storage().persistent().has(&key) {
-                        env.storage().persistent().extend_ttl(
-                            &key,
-                            ttl,
-                            ttl,
-                        );
+                        env.storage().persistent().extend_ttl(&key, ttl, ttl);
                     }
                 }
                 // ── All other keys live in instance storage ───────────────────
                 // Instance TTL is contract-wide; one call covers all instance keys.
                 _ => {
                     if !extended_instance {
-                        env.storage().instance().extend_ttl(
-                            ttl,
-                            ttl,
-                        );
+                        env.storage().instance().extend_ttl(ttl, ttl);
                         extended_instance = true;
                     }
                 }
