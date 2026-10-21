@@ -1,0 +1,91 @@
+{
+  "name": "Validate base-yield guard",
+  "on": {
+    "push": {
+      "branches": [
+        "validate/1559-current-main"
+      ]
+    }
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "jobs": {
+    "validate": {
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 40,
+      "strategy": {
+        "fail-fast": false,
+        "matrix": {
+          "variant": [
+            "base",
+            "branch"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "ref": "${{ matrix.variant == 'base' && '64a62c80cfa66f53baab7f6f5b5358cc5cbe4e7c' || github.sha }}"
+          }
+        },
+        {
+          "name": "Malware guard",
+          "run": "bash .github/scripts/malware-scan.sh"
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "targets": "wasm32v1-none",
+            "components": "rustfmt,clippy"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2",
+          "with": {
+            "key": "yield-${{ matrix.variant }}"
+          }
+        },
+        {
+          "name": "Format",
+          "run": "cargo fmt --all -- --check"
+        },
+        {
+          "name": "Full test suite",
+          "if": "always()",
+          "run": "cargo test -p liquifact_escrow --lib"
+        },
+        {
+          "name": "Clippy",
+          "if": "always()",
+          "run": "cargo clippy -p liquifact_escrow --all-targets --message-format=short"
+        },
+        {
+          "name": "Build WASM",
+          "if": "always()",
+          "run": "cargo build --target wasm32v1-none --release -p liquifact_escrow"
+        },
+        {
+          "name": "Official pinned Stellar CLI",
+          "if": "always()",
+          "run": "mkdir -p /tmp/stellar-cli\ncurl --fail --location --silent --show-error https://github.com/stellar/stellar-cli/releases/download/v25.1.0/stellar-cli-25.1.0-x86_64-unknown-linux-gnu.tar.gz -o /tmp/stellar-cli.tar.gz\ntar -xzf /tmp/stellar-cli.tar.gz -C /tmp/stellar-cli\nfind /tmp/stellar-cli -type f -name stellar -exec chmod +x {} \\;\nfind /tmp/stellar-cli -type f -name stellar -exec dirname {} \\; >> \"$GITHUB_PATH\""
+        },
+        {
+          "name": "Optimize, strip documentation and enforce size",
+          "if": "always()",
+          "run": "stellar contract optimize --wasm target/wasm32v1-none/release/liquifact_escrow.wasm --wasm-out target/opt.wasm\npython3 scripts/strip_spec_docs.py target/opt.wasm target/deploy.wasm\nwc -c target/wasm32v1-none/release/liquifact_escrow.wasm target/opt.wasm target/deploy.wasm | tee target/size.txt\npython3 -c \"import pathlib; assert pathlib.Path('target/deploy.wasm').stat().st_size <= 131072\""
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "yield-${{ matrix.variant }}",
+            "path": "target/size.txt\ntarget/deploy.wasm",
+            "retention-days": 7
+          }
+        }
+      ]
+    }
+  }
+}
