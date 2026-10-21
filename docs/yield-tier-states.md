@@ -145,7 +145,7 @@ stateDiagram-v2
 | **108** | `TieredSecondDeposit` | `fund_with_commitment` | Called by an investor who already has principal (`prev > 0`). |
 | **111** | `CommitmentLockExceedsMaturity` | `fund_with_commitment` | `now + committed_lock_secs` extends past escrow maturity. |
 | **128** | `InvestorCommitmentLockNotExpired` | `claim_investor_payout` | Attempted claim while `ledger.timestamp() < InvestorClaimNotBefore`. |
-| **250** | `YieldBpsLockedAfterFunding` | `update_yield_bps` | Principal was already recorded (`funded_amount > 0`); the base yield is locked once investors exist. |
+| **259** | `YieldBpsLockedAfterFunding` | `update_yield_bps` | Principal was already recorded (`funded_amount > 0`); the base yield is locked once investors exist. |
 
 ---
 
@@ -163,7 +163,7 @@ investors who funded before the change and the ones who funded after it — with
 no on-chain signal of the split.
 
 The base may therefore only be changed while `escrow.funded_amount == 0`. Any
-later update is rejected with `YieldBpsLockedAfterFunding` (code **250**).
+later update is rejected with `YieldBpsLockedAfterFunding` (code **259**).
 
 A **full unfund** (every investor's contribution returned to zero) brings the
 escrow back to `funded_amount == 0` and releases the lock. That is safe: the
@@ -189,7 +189,7 @@ would silently fall back to the base.
 | `funded_amount == 0`, no tiers | any valid base | Accepted |
 | `funded_amount == 0`, every tier at or above the new base | any valid base | Accepted |
 | `funded_amount == 0`, a tier below the new base | raises the base | Rejected — `TierYieldBelowBase` (11) |
-| `funded_amount > 0` | any | Rejected — `YieldBpsLockedAfterFunding` (250) |
+| `funded_amount > 0` | any | Rejected — `YieldBpsLockedAfterFunding` (259) |
 
 ---
 
