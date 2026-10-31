@@ -50,6 +50,36 @@
           "run": "cargo build --target wasm32v1-none --release -p liquifact_escrow"
         }
       ]
+    },
+    "core": {
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 20,
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "persist-credentials": false
+          }
+        },
+        {
+          "name": "Malware guard",
+          "run": "bash .github/scripts/malware-scan.sh"
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "targets": "wasm32v1-none",
+            "components": "clippy,rustfmt"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2"
+        },
+        {
+          "name": "Original core suites plus changed yield suite",
+          "run": "cargo test -p liquifact_escrow --lib tests::init::\ncargo test -p liquifact_escrow --lib tests::funding::\ncargo test -p liquifact_escrow --lib tests::settlement::\ncargo test -p liquifact_escrow --lib tests::admin::\ncargo test -p liquifact_escrow --lib tests::yield_tier_update::"
+        }
+      ]
     }
   }
 }
