@@ -23,14 +23,16 @@
         },
         {
           "name": "Malware guard",
-          "run": "bash .github/scripts/malware-scan.sh"
+          "run": "bash .github/scripts/malware-scan.sh",
+          "id": "scan"
         },
         {
           "uses": "dtolnay/rust-toolchain@stable",
           "with": {
             "targets": "wasm32v1-none",
             "components": "clippy,rustfmt"
-          }
+          },
+          "id": "toolchain"
         },
         {
           "uses": "Swatinem/rust-cache@v2"
@@ -41,12 +43,12 @@
         },
         {
           "name": "Clippy",
-          "if": "always()",
+          "if": "always() && steps.scan.outcome == 'success' && steps.toolchain.outcome == 'success'",
           "run": "cargo clippy -p liquifact_escrow --all-targets"
         },
         {
           "name": "Release WASM",
-          "if": "always()",
+          "if": "always() && steps.scan.outcome == 'success' && steps.toolchain.outcome == 'success'",
           "run": "cargo build --target wasm32v1-none --release -p liquifact_escrow"
         }
       ]
@@ -63,14 +65,16 @@
         },
         {
           "name": "Malware guard",
-          "run": "bash .github/scripts/malware-scan.sh"
+          "run": "bash .github/scripts/malware-scan.sh",
+          "id": "scan"
         },
         {
           "uses": "dtolnay/rust-toolchain@stable",
           "with": {
             "targets": "wasm32v1-none",
             "components": "clippy,rustfmt"
-          }
+          },
+          "id": "toolchain"
         },
         {
           "uses": "Swatinem/rust-cache@v2"
