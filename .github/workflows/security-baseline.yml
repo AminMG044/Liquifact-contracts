@@ -1,0 +1,50 @@
+{
+  "name": "Compare unchanged contract baseline",
+  "on": {
+    "push": {
+      "branches": [
+        "validate/security-baseline-1608"
+      ]
+    }
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "jobs": {
+    "baseline": {
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 20,
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "persist-credentials": false
+          }
+        },
+        {
+          "name": "Malware guard",
+          "run": "bash .github/scripts/malware-scan.sh"
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "targets": "wasm32v1-none",
+            "components": "clippy"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2"
+        },
+        {
+          "name": "Unchanged main full tests",
+          "run": "cargo test -p liquifact_escrow --lib"
+        },
+        {
+          "name": "Unchanged main Clippy",
+          "if": "always()",
+          "run": "cargo clippy -p liquifact_escrow --all-targets"
+        }
+      ]
+    }
+  }
+}
