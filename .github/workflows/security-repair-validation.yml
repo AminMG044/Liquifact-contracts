@@ -1,0 +1,55 @@
+{
+  "name": "Validate security repair 1608",
+  "on": {
+    "push": {
+      "branches": [
+        "validate/security-repair-1608"
+      ]
+    }
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "jobs": {
+    "validation": {
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 25,
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "persist-credentials": false
+          }
+        },
+        {
+          "name": "Malware guard",
+          "run": "bash .github/scripts/malware-scan.sh"
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "targets": "wasm32v1-none",
+            "components": "clippy,rustfmt"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2"
+        },
+        {
+          "name": "Full contract tests",
+          "run": "cargo test -p liquifact_escrow --lib"
+        },
+        {
+          "name": "Clippy",
+          "if": "always()",
+          "run": "cargo clippy -p liquifact_escrow --all-targets"
+        },
+        {
+          "name": "Release WASM",
+          "if": "always()",
+          "run": "cargo build --target wasm32v1-none --release -p liquifact_escrow"
+        }
+      ]
+    }
+  }
+}
